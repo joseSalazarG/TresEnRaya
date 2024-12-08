@@ -167,7 +167,7 @@ public:
         time_t hora = time(nullptr);
         tm* horaLocal = localtime(&hora);
         char fechaHora[80];
-        strftime(fechaHora, 80, "%m_%d_%Y %H_%M", horaLocal);
+        strftime(fechaHora, 80, "%m_%d_%Y %H_%M_%S", horaLocal);
         char nombreArchivo[100];
         sprintf(nombreArchivo, "partida_%s.txt", fechaHora);
 
@@ -193,40 +193,20 @@ private:
     Jugador jugador1;
     Jugador jugador2;
     Jugador* jugadorActual;
+    bool hayGanador;
 
 public:
     TresEnRaya() :
         jugador1("Jugador 1", 'X'),
         jugador2("Jugador 2", 'O'),
-        jugadorActual(&jugador1) {}
+        jugadorActual(&jugador1),
+        hayGanador(false) {}
 
     void cambiarTurno() {
         jugadorActual = (jugadorActual == &jugador1) ? &jugador2 : &jugador1;
     }
 
     void jugadorVSjugador() {
-        cout << "Elige una posicion del 1 al 9:\n";
-
-        while(tablero.hayGanador == false) {
-            system("cls");
-            tablero.mostrarGuia();
-            mueveElJugador();
-
-             tablero.buscarGanador(jugadorActual->getFicha());
-
-            // verificar si hay ganador
-            if(tablero.hayGanador) {
-                tablero.mostrar();
-                cout << "El " << jugadorActual->getNombre() << " ha ganado!\n";
-                tablero.imprimirPartida(jugadorActual->getFicha());
-
-            } else {
-                cambiarTurno();
-            }
-        }
-    }
-
-    void jugarVScomputadora() {
         cout << "Elige una posicion del 1 al 9:\n";
 
         while(tablero.hayGanador == false) {
@@ -241,7 +221,30 @@ public:
                 tablero.mostrar();
                 cout << "El " << jugadorActual->getNombre() << " ha ganado!\n";
                 tablero.imprimirPartida(jugadorActual->getFicha());
+                if (!preguntarRepetir()) return; // Preguntar si quiere jugar de nuevo
+            } else {
+                cambiarTurno();
+            }
+        }
+    }
 
+    void jugarVScomputadora() {
+        while (cin.get() != '\n');
+        cout << "Elige una posicion del 1 al 9:\n";
+
+        while(tablero.hayGanador == false) {
+            system("cls");
+            tablero.mostrarGuia();
+            mueveElJugador();
+
+            tablero.buscarGanador(jugadorActual->getFicha());
+
+            // verificar si hay ganador
+            if(tablero.hayGanador) {
+                tablero.mostrar();
+                cout << "El " << jugadorActual->getNombre() << " ha ganado!\n";
+                tablero.imprimirPartida(jugadorActual->getFicha());
+                if (!preguntarRepetir()) return; // Preguntar si quiere jugar de nuevo
             } else {
                 tablero.mostrar();
                 mueveLaComputadora('O');
@@ -250,6 +253,7 @@ public:
     }
 
     void computadoraVScomputadora() {
+        while (cin.get() != '\n');
         system("cls");
         tablero.mostrarGuia();
 
@@ -263,6 +267,9 @@ public:
             mueveLaComputadora(fichaActual);
             swap(fichaActual, fichaEnEspera);
         }
+
+        // Preguntar si quiere jugar de nuevo
+        if (!preguntarRepetir()) return;
     }
     
     void mueveElJugador() {
@@ -282,7 +289,7 @@ public:
             if(tablero.esPosicionValida(pos)) {
                 break;
             } else {
-                cout << "Posicion no valida. Intentalo de nuevo.\n";
+                cout << "\033[31m" << "Posicion no valida. Intentalo de nuevo.\n" << "\033[0m";
             }
         }
 
@@ -302,7 +309,7 @@ public:
             int fila = rand() % 3;
             int columna = rand() % 3;
             pos = Posicion(fila, columna);
-        } while (!tablero.esPosicionValida(pos));
+        } while (!tablero.esPosicionValida(pos)); // o(1)
 
         if (tablero.contarFichas(ficha == 3)) {
             tablero.eliminarFichaAntigua(ficha);
@@ -325,19 +332,54 @@ public:
 
     Posicion pedirMovimiento() {
         int numero;
-        cout << "Elige una posicion (1-9): ";
-        cin >> numero;
+        string entrada;
+
+        while (true) {
+            cout << "Elige una posicion (1-9): ";            
+            cin >> entrada;
+
+            if (isdigit(entrada[0]) && entrada.length() == 1) {
+                numero = stoi(entrada);
+                if (numero >= 1 && numero <= 9) {
+                    break;
+                }
+            }
+
+            cout << "\033[31m" << "Posicion no valida. Intentalo de nuevo.\n" << "\033[0m";
+        }
 
         int fila = 2 - (numero - 1) / 3;
         int columna = (numero - 1) % 3;
 
         return Posicion(fila, columna);
     }
+
+    // Nueva función para preguntar si quiere jugar de nuevo 
+    bool preguntarRepetir() {
+        char opcion;
+        cout << "Quieres jugar de nuevo? (1: Si, 2: No): ";
+        while (cin.get() != '\n');
+        cin >> opcion;
+        while (cin.get() != '\n');
+
+        if (opcion == '1') {
+            // Reiniciar el juego
+            tablero = Tablero(); // Reiniciar el tablero
+            hayGanador = false; // Reiniciar el estado de ganador
+            return true;
+        } else {
+            exit(0); // mata el programa regresando 0
+        }
+        
+        while (cin.get() != '\n');
+        return false;
+	}
 };
 
 int main() {
     TresEnRaya juego;
-    int opcion;
+    string entrada;
+    int num;
 
     cout << "  Bienvenido al juego de Tres en Raya!\n";
     cout << "  Modo de Juego:\n";
@@ -345,28 +387,33 @@ int main() {
     cout << "  2. Humano vs Computadora\n";
     cout << "  3. Computadora vs Computadora\n\n";
 
-    do
-    {
+    do {
+        // clear opcion buffer
         cout << ">  Elige una opcion: ";
-        cin >> opcion;
-    } while (opcion !=1 && opcion !=2 && opcion !=3);
-    
-    
-    switch(opcion){
-        //----Humano vs Humano----//
-        case 1:
-            juego.jugadorVSjugador();
-        break;
+        cin >> entrada;
+        if (isdigit(entrada[0]) && entrada.length() == 1) {
+            num = stoi(entrada);
+            if (num >= 1 && num <= 3) {
+                break;
+            }
+        }
+    } while (true);
 
-        //----Humano vs Computador//
-        case 2:
-            juego.jugarVScomputadora();
-        break;
+    // Lógica para reiniciar el juego o cambiar de modo
+    while (true) {
+        switch(num) {
+            case 1:
+                juego.jugadorVSjugador();
+                break;
 
-        //----Computadora vs Computadora----//
-        case 3:
-            juego.computadoraVScomputadora();
-        break;
+            case 2:
+                juego.jugarVScomputadora();
+                break;
+
+            case 3:
+                juego.computadoraVScomputadora();
+                break;
+        }
     }
 
     system("pause");
