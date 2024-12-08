@@ -3,7 +3,10 @@
 #include <queue>
 #include <fstream>
 #include <time.h>
+#include <unistd.h>
 
+// Nota: si todos los cin y cout marcan error, quitar y poner otra vez esta linea para recargar el proyecto
+// Nota2: cosas de c++ que no entiendo, pero funciona
 using namespace std;
 
 // Clase para representar a un jugador
@@ -41,6 +44,8 @@ private:
     queue<Posicion> posicionesJugador2; // Cola para las posiciones del Jugador 2
 
 public:
+    bool hayGanador = false;
+
     Tablero() {
         inicializar();
     }
@@ -61,7 +66,7 @@ public:
 
     void colocarFicha(const Posicion& pos, char ficha) {
         casillas[pos.getFila()][pos.getColumna()] = ficha;
-        // Añadir la posición a la cola correspondiente
+        // Añadir la posicion a la cola correspondiente
         if (ficha == 'X') {
             posicionesJugador1.push(pos);
         } else {
@@ -75,10 +80,10 @@ public:
             for(int j = 0; j < TAMANO; j++) {
                 char ficha = casillas[i][j];
                 // Verificar si la ficha es la más antigua y marcarla con color
-                if (!posicionesJugador1.empty() && ficha == 'X' && 
+                if (!posicionesJugador1.empty() && ficha == 'X' &&
                     posicionesJugador1.front().getFila() == i && posicionesJugador1.front().getColumna() == j) {
                     cout << "\033[31m " << ficha << "\033[0m "; // Cambiar a rojo
-                } else if (!posicionesJugador2.empty() && ficha == 'O' && 
+                } else if (!posicionesJugador2.empty() && ficha == 'O' &&
                            posicionesJugador2.front().getFila() == i && posicionesJugador2.front().getColumna() == j) {
                     cout << "\033[31m " << ficha << "\033[0m "; // Cambiar a rojo
                 } else {
@@ -103,43 +108,37 @@ public:
         cout << "\n";
     }
 
-    bool estaLleno() const {
-        for(int i = 0; i < TAMANO; i++) {
-            for(int j = 0; j < TAMANO; j++) {
-                if(casillas[i][j] == ' ') return false;
-            }
-        }
-        return true;
-    }
-
-    bool hayGanador(char jugador) const {
+    void buscarGanador(char jugador) {
         // en la horizontal
         for(int i = 0; i < TAMANO; i++) {
             if(casillas[i][0] == jugador && casillas[i][1] == jugador && casillas[i][2] == jugador) {
-                return true;
+                hayGanador = true;
+                return;
             }
         } // o(1)
 
         // en la vertical
         for(int i = 0; i < TAMANO; i++) {
             if(casillas[0][i] == jugador && casillas[1][i] == jugador && casillas[2][i] == jugador) {
-                return true;
+                hayGanador = true;
+                return;
             }
         } // o(1)
 
         // en la diagonal
         if(casillas[0][0] == jugador && casillas[1][1] == jugador && casillas[2][2] == jugador) {
-            return true;
+            hayGanador = true;
+            return;
         } // o(1)
+
         // diagonal inversa
         if(casillas[0][2] == jugador && casillas[1][1] == jugador && casillas[2][0] == jugador) {
-            return true;
+            hayGanador = true;
+            return;
         } // o(1)
-
-        return false; 
     }
 
-    // Nueva función para contar las fichas de un jugador
+    // Nueva funcion para contar las fichas de un jugador
     int contarFichas(char ficha) const {
         int contador = 0;
         for(int i = 0; i < TAMANO; i++) {
@@ -152,7 +151,7 @@ public:
         return contador;
     }
 
-    // Nueva función para eliminar la ficha más antigua
+    // Nueva funcion para eliminar la ficha más antigua
     void eliminarFichaAntigua(char ficha) {
         queue<Posicion>& posiciones = (ficha == 'X') ? posicionesJugador1 : posicionesJugador2;
         if (!posiciones.empty()) {
@@ -163,7 +162,7 @@ public:
     }
 
     void imprimirPartida(char jugador) const {
-        cout << "Guardando partida...\n";
+        cout << "Guardando partida\n";
         // obtener la fecha y hora actual como nombre del archivo
         time_t hora = time(nullptr);
         tm* horaLocal = localtime(&hora);
@@ -184,7 +183,7 @@ public:
         archivo << "El " << jugador << " ha ganado!\n";
         // cerramos el archivo
         archivo.close();
-    }
+    } // o(1)
 };
 
 // Clase principal del juego
@@ -196,7 +195,7 @@ private:
     Jugador* jugadorActual;
 
 public:
-    TresEnRaya() : 
+    TresEnRaya() :
         jugador1("Jugador 1", 'X'),
         jugador2("Jugador 2", 'O'),
         jugadorActual(&jugador1) {}
@@ -205,71 +204,171 @@ public:
         jugadorActual = (jugadorActual == &jugador1) ? &jugador2 : &jugador1;
     }
 
-    void jugar() {
-        cout << "¡Bienvenido al juego de Tres en Raya!\n";
-        cout << "Elige una posición del 1 al 9:\n";
-        tablero.mostrarGuia();
+    void jugadorVSjugador() {
+        cout << "Elige una posicion del 1 al 9:\n";
 
-        bool hayGanador = false;
-        Posicion pos(0, 0);
-        
-        while(!hayGanador) {
-            tablero.mostrar();
-            
-            cout << "Turno de " << jugadorActual->getNombre() << " (" << jugadorActual->getFicha() << ")\n";
+        while(tablero.hayGanador == false) {
+            system("cls");
+            tablero.mostrarGuia();
+            mueveElJugador();
 
-            // Indicar al jugador qué ficha se eliminará si ya tiene tres fichas
-            if(tablero.contarFichas(jugadorActual->getFicha()) == 3) {
-                cout << "Nota: Se eliminara la ficha mas antigua antes de colocar una nueva.\n";
-            }
-            
-            // repetir pedir movimiento hasta que sea valido
-            while (true) {
-                pos = pedirMovimiento();
-                if(tablero.esPosicionValida(pos)) {
-                    break;
-                } else {
-                    cout << "Posicion no valida. Intentalo de nuevo.\n";
-                }
-            }
-
-            // Verificar si el jugador ya tiene tres fichas en el tablero
-            if(tablero.contarFichas(jugadorActual->getFicha()) == 3) {
-                tablero.eliminarFichaAntigua(jugadorActual->getFicha());
-            }
-
-            tablero.colocarFicha(pos, jugadorActual->getFicha());
+             tablero.buscarGanador(jugadorActual->getFicha());
 
             // verificar si hay ganador
-            if(tablero.hayGanador(jugadorActual->getFicha())) {
+            if(tablero.hayGanador) {
                 tablero.mostrar();
                 cout << "El " << jugadorActual->getNombre() << " ha ganado!\n";
                 tablero.imprimirPartida(jugadorActual->getFicha());
-                hayGanador = true;
-                
+
             } else {
                 cambiarTurno();
             }
         }
     }
 
-private:
+    void jugarVScomputadora() {
+        cout << "Elige una posicion del 1 al 9:\n";
+
+        while(tablero.hayGanador == false) {
+            system("cls");
+            tablero.mostrarGuia();
+            mueveElJugador();
+
+            tablero.buscarGanador(jugadorActual->getFicha());
+
+            // verificar si hay ganador
+            if(tablero.hayGanador) {
+                tablero.mostrar();
+                cout << "El " << jugadorActual->getNombre() << " ha ganado!\n";
+                tablero.imprimirPartida(jugadorActual->getFicha());
+
+            } else {
+                tablero.mostrar();
+                mueveLaComputadora('O');
+            }
+        }
+    }
+
+    void computadoraVScomputadora() {
+        system("cls");
+        tablero.mostrarGuia();
+
+        char fichaActual = 'X';
+        char fichaEnEspera = 'O';
+
+        while(tablero.hayGanador == false) {
+            system("cls");
+            cout << "Turno de la computadora " << fichaActual << "\n";
+            tablero.mostrar();
+            mueveLaComputadora(fichaActual);
+            swap(fichaActual, fichaEnEspera);
+        }
+    }
+    
+    void mueveElJugador() {
+        Posicion pos(0, 0);
+        tablero.mostrar();
+
+        cout << "Turno de " << jugadorActual->getNombre() << " (" << jugadorActual->getFicha() << ")\n";
+
+        // Indicar al jugador qué ficha se eliminará si ya tiene tres fichas
+        if(tablero.contarFichas(jugadorActual->getFicha()) == 3) {
+            cout << "Nota: Se eliminara la ficha mas antigua antes de colocar una nueva.\n";
+        }
+
+        // repetir pedir movimiento hasta que sea valido
+        while (true) {
+            pos = pedirMovimiento();
+            if(tablero.esPosicionValida(pos)) {
+                break;
+            } else {
+                cout << "Posicion no valida. Intentalo de nuevo.\n";
+            }
+        }
+
+        // Verificar si el jugador ya tiene tres fichas en el tablero
+        if(tablero.contarFichas(jugadorActual->getFicha()) == 3) {
+            tablero.eliminarFichaAntigua(jugadorActual->getFicha());
+        }
+
+        tablero.colocarFicha(pos, jugadorActual->getFicha());
+    }
+    
+    void mueveLaComputadora(char ficha) {
+        sleep(3); // son segundos, no milisegundos
+        srand(static_cast<unsigned int>(time(0)));
+        Posicion pos(0, 0);
+        do {
+            int fila = rand() % 3;
+            int columna = rand() % 3;
+            pos = Posicion(fila, columna);
+        } while (!tablero.esPosicionValida(pos));
+
+        if (tablero.contarFichas(ficha == 3)) {
+            tablero.eliminarFichaAntigua(ficha);
+        }
+
+        // Verificar si el jugador ya tiene tres fichas en el tablero
+        if(tablero.contarFichas(ficha) == 3) {
+            tablero.eliminarFichaAntigua(ficha);
+        }
+
+        tablero.colocarFicha(pos, ficha);
+        tablero.buscarGanador(ficha);
+
+        if(tablero.hayGanador) {
+            tablero.mostrar();
+            cout << "La computadora " << ficha << " ha ganado!\n";
+            tablero.imprimirPartida(ficha);
+        } 
+    }
+
     Posicion pedirMovimiento() {
         int numero;
         cout << "Elige una posicion (1-9): ";
         cin >> numero;
-        
+
         int fila = 2 - (numero - 1) / 3;
         int columna = (numero - 1) % 3;
-        
+
         return Posicion(fila, columna);
     }
 };
 
 int main() {
     TresEnRaya juego;
-    juego.jugar();
-    cout << "Presiona una tecla";
-    cin >> ws;
+    int opcion;
+
+    cout << "  Bienvenido al juego de Tres en Raya!\n";
+    cout << "  Modo de Juego:\n";
+    cout << "  1. Humano vs Humano\n";
+    cout << "  2. Humano vs Computadora\n";
+    cout << "  3. Computadora vs Computadora\n\n";
+
+    do
+    {
+        cout << ">  Elige una opcion: ";
+        cin >> opcion;
+    } while (opcion !=1 && opcion !=2 && opcion !=3);
+    
+    
+    switch(opcion){
+        //----Humano vs Humano----//
+        case 1:
+            juego.jugadorVSjugador();
+        break;
+
+        //----Humano vs Computador//
+        case 2:
+            juego.jugarVScomputadora();
+        break;
+
+        //----Computadora vs Computadora----//
+        case 3:
+            juego.computadoraVScomputadora();
+        break;
+    }
+
+    system("pause");
     return 0;
 }
